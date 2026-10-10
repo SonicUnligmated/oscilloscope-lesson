@@ -387,6 +387,7 @@
   const SCR = { x0: 56, x1: 616, y0: 50, y1: 306, cx: 336, cy: 178, divx: 56, divy: 32 };
   const VDIV_STEPS = [0.1, 0.2, 0.5, 1, 2, 5];
   const TDIV_STEPS = [0.05, 0.1, 0.2, 0.5, 1, 2];
+  /* Default (example) signal and scale: the starting state of the simulated CRO */
   const LAB = { wave: 'tri', vpp: 1.85, freq: 1000 / 0.66, vdiv: 0.5, tdiv: 0.2, xpos: 0, ypos: 0 };
   const S = Object.assign({}, LAB);
   const TRIG_DIV = -4;            // trigger point sits on the −4 gridline when X-POS = 0
@@ -642,7 +643,7 @@
         formula: 'A = Vpp / 2 = ' + fmtV(vpp / 2) + ' V', mark: 'peak', highlightField: 'a', teach: 'a', pop: 'A = Vpp / 2' },
       wave: { title: 'Waveform', body: 'Voltage versus time. Use Y for amplitude and X for period.',
         formula: 'f = 1/T = 1/(' + sci(tms / 1000) + ' s) ≈ ' + fmtFshort(1000 / tms) + ' Hz', mark: 'wave', highlightField: 'f', teach: 'f', pop: 'f = 1/T' },
-      div: { title: 'One division', body: 'A single graticule square — the unit you count. Vertical divs × volts/div → volts; horizontal divs × time/div → time.',
+      div: { title: 'One division', body: 'A single graticule square — the unit counted on the screen. Vertical divs × volts/div → volts; horizontal divs × time/div → time.',
         formula: '1 div = one grid square', mark: 'div', highlightField: null, teach: null, pop: '1 div = 1 grid square' }
     };
     return map[key];
@@ -707,8 +708,8 @@
       if (info.plug === 'y') teachHint.textContent = 'Y is live in the formula → Vpp = ' + trimNum(Y, 2) + ' × ' + trimNum(S.vdiv, 3) + ' = ' + fmtV(Y * S.vdiv) + ' V.';
       else if (info.plug === 'x') teachHint.textContent = 'X is live in the formula → T = ' + trimNum(X, 2) + ' × ' + trimNum(S.tdiv, 3) + ' ms = ' + trimNum(X * S.tdiv, 4) + ' ms = ' + sci(X * S.tdiv / 1000) + ' s.';
       else if (key === 'div') teachHint.textContent = 'A division is one grid square. Count them: vertical for Y (voltage), horizontal for X (time).';
-      else if (info.teach === 'vdiv') teachHint.textContent = 'volts/div tells you what each vertical square is worth. Here every vertical div = ' + trimNum(S.vdiv, 3) + ' V.';
-      else if (info.teach === 'tdiv') teachHint.textContent = 'time/div tells you what each horizontal square is worth. Here every horizontal div = ' + trimNum(S.tdiv, 3) + ' ms.';
+      else if (info.teach === 'vdiv') teachHint.textContent = 'volts/div gives the value of each vertical square. Here every vertical div = ' + trimNum(S.vdiv, 3) + ' V.';
+      else if (info.teach === 'tdiv') teachHint.textContent = 'time/div gives the value of each horizontal square. Here every horizontal div = ' + trimNum(S.tdiv, 3) + ' ms.';
       else teachHint.textContent = info.body;
     }
     if (formulaPop && info.pop && clientX != null) {
@@ -958,14 +959,8 @@
   }
   const btnLabScale = document.getElementById('btn-lab-scale');
   if (btnLabScale) btnLabScale.addEventListener('click', () => { resetScope(); onSettingsChanged(); });
-  const btnMyLab = document.getElementById('btn-my-lab');
-  if (btnMyLab) btnMyLab.addEventListener('click', () => {
-    S.wave = LAB.wave; S.vpp = LAB.vpp; S.freq = LAB.freq;
-    resetScope();
-    onSettingsChanged();
-  });
 
-  /* —— Enter my readings —— */
+  /* —— Enter readings —— */
   const reY = document.getElementById('re-y'), reV = document.getElementById('re-vdiv');
   const reX = document.getElementById('re-x'), reT = document.getElementById('re-tdiv');
   const reMsg = document.getElementById('re-msg');
@@ -1021,7 +1016,7 @@
       } else {
         good = within(v, target[key], 0.02);
         if (key === 'f' && !good && within(v, S.freq / 1000, 0.03)) {
-          nudges.push('f ≈ ' + trimNum(v, 3) + ' means you divided 1 by T in milliseconds. Convert first: ' + trimNum(T, 4) + ' ms = ' + sci(T / 1000) + ' s, so f = 1 / (' + sci(T / 1000) + ' s) ≈ ' + fmtFshort(S.freq) + ' Hz.');
+          nudges.push('f ≈ ' + trimNum(v, 3) + ' comes from dividing 1 by T in milliseconds. Convert first: ' + trimNum(T, 4) + ' ms = ' + sci(T / 1000) + ' s, so f = 1 / (' + sci(T / 1000) + ' s) ≈ ' + fmtFshort(S.freq) + ' Hz.');
         }
         if (key === 'a' && !good && within(v, S.vpp, 0.02)) nudges.push('That is Vpp. Amplitude is half of it: A = Vpp / 2.');
       }
@@ -1132,7 +1127,7 @@
     if (guideIndex < 0) {
       guideIndex = 0;
     } else if (guideIndex >= beats.length - 1) {
-      // Start over: clear answers and return the CRO knobs to lab settings
+      // Start over: clear answers and return the CRO knobs to the default scale
       clearCalc();
       resetScope();
       stopGuide();

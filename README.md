@@ -15,10 +15,10 @@ Site-wide Practical colorful live theme (scanline / phosphor / waveform beams). 
 2. What is an oscilloscope? (numbered graticule + live t/V)
 3. Medical perspectives (ECG / EEG / EMG — high-contrast cards on the live theme)
 4. Method (click a step → illustration panel)
-5. Formulas & results (merged — worked values match Trace)
+5. Formulas & results (merged — worked example values match Trace)
 6. Trace waveforms (example traces always visible)
 7. MCQs (scrollable full bank — select / feedback / explanations)
-8. Practical (final — live CRO with VOLTS/DIV, TIME/DIV, X-POS, Y-POS knobs + function generator (amplitude, frequency, wave), "Enter my readings", hover teaching, guided calc with ms→s step, draw-graph stroke MCQ)
+8. Practical (final — live CRO with VOLTS/DIV, TIME/DIV, X-POS, Y-POS knobs + function generator (amplitude, frequency, wave), "Enter readings", hover teaching, guided calc with ms→s step, draw-graph stroke MCQ)
 
 ## Local preview (optional)
 

@@ -40,7 +40,7 @@
           <div class="aim-hero">
             To measure the amplitude, time period and frequency of a wave using the Cathode Ray Oscilloscope (CRO).
           </div>
-          <p class="lede">By the end of this session you should be able to:</p>
+          <p class="lede">By the end of this session, students should be able to:</p>
           <ul class="outcome-list">
             <li>Explain the structure and function of the oscilloscope and when to use it.</li>
             <li>Measure amplitude, time period and frequency of a wave from the screen.</li>
@@ -299,9 +299,9 @@
             <p class="formula-note">Put $T$ in <strong>seconds</strong> before taking $1/T$: 1&nbsp;ms $= 10^{-3}$&nbsp;s.</p>
           </div>
 
-          <h3>Worked result (from the graded lab)</h3>
+          <h3>Worked example</h3>
           <p class="airy">
-            Scale on the CRO: volts/div $= 0.5$&nbsp;V/div · time/div $= 0.2$&nbsp;ms/div ·
+            Example readings. Scale on the CRO: volts/div $= 0.5$&nbsp;V/div · time/div $= 0.2$&nbsp;ms/div ·
             $Y = 3.7$ div · $X = 3.3$ div.
           </p>
           <ol class="work-steps">
@@ -409,7 +409,7 @@
       <section class="view" id="view-mcqs">
         <div class="card card-wide">
           <h2>MCQs</h2>
-          <p class="lede">All lab questions on one scrollable page. Pick an answer — wrong choices nudge you to try again; a correct pick locks and shows the explanation.</p>
+          <p class="lede">All lab questions on one scrollable page. Pick an answer — a wrong choice gives a hint to try again; a correct pick locks and shows the explanation.</p>
           <div class="mcq-toolbar">
             <span class="mcq-progress" id="mcq-progress">0 / 0 answered</span>
             <button type="button" class="mcq-reset" id="mcq-reset">Reset answers</button>
@@ -520,14 +520,13 @@
               <div class="fp-group">
                 <div class="fp-head">
                   <span class="fp-title">CRO controls</span>
-                  <button type="button" class="fp-btn" id="btn-lab-scale">Lab scale · 0.5 V/div · 0.2 ms/div</button>
+                  <button type="button" class="fp-btn" id="btn-lab-scale">Default scale · 0.5 V/div · 0.2 ms/div</button>
                 </div>
                 <div class="knob-row" id="knobs-scope"></div>
               </div>
               <div class="fp-group">
                 <div class="fp-head">
                   <span class="fp-title">Function generator</span>
-                  <button type="button" class="fp-btn" id="btn-my-lab">Load my lab signal</button>
                 </div>
                 <div class="knob-row" id="knobs-gen">
                   <div class="wave-select" role="radiogroup" aria-label="Wave shape" id="wave-select">
@@ -538,8 +537,8 @@
                   </div>
                 </div>
                 <details class="readings-entry" id="readings-entry">
-                  <summary>Enter my readings</summary>
-                  <p class="re-help">Type the numbers from your lab book. The screen redraws to match; then work the formulas.</p>
+                  <summary>Enter readings</summary>
+                  <p class="re-help">Type in a set of CRO readings. The screen redraws to match; then work the formulas.</p>
                   <div class="re-grid">
                     <label>Y deflection <span class="re-in"><input id="re-y" type="number" step="any" min="0" inputmode="decimal"><span class="unit">div</span></span></label>
                     <label>volts/div <span class="re-in"><input id="re-vdiv" type="number" step="any" min="0" inputmode="decimal"><span class="unit">V/div</span></span></label>
@@ -547,7 +546,7 @@
                     <label>time/div <span class="re-in"><input id="re-tdiv" type="number" step="any" min="0" inputmode="decimal"><span class="unit">ms/div</span></span></label>
                   </div>
                   <div class="re-actions">
-                    <button type="button" class="fp-btn primary" id="re-apply">Draw my readings</button>
+                    <button type="button" class="fp-btn primary" id="re-apply">Draw readings</button>
                     <span class="re-msg" id="re-msg" role="status" aria-live="polite"></span>
                   </div>
                 </details>
@@ -632,7 +631,7 @@
               <div class="calc-actions">
                 <button type="button" class="check" id="btn-check">Check</button>
                 <button type="button" class="guide" id="btn-guide">Start guided calc</button>
-                <button type="button" class="reset-lab" id="btn-reset-lab">Reset to lab settings</button>
+                <button type="button" class="reset-lab" id="btn-reset-lab">Reset to default scale</button>
               </div>
               <div class="calc-feedback" id="fb-calc" role="status" aria-live="polite"></div>
             </div>
@@ -642,7 +641,7 @@
 
         <div class="draw-mcq" id="draw-mcq">
           <h3>Draw the waveform</h3>
-          <p class="lede draw-lede">Choose the next stroke on the lab graph paper. One question at a time — wrong picks nudge you; correct locks and explains, then Next advances.</p>
+          <p class="lede draw-lede">Choose the next stroke on the lab graph paper. One question at a time — a wrong pick gives a hint; a correct pick locks and explains, then Next advances.</p>
           <div class="draw-layout">
             <div class="draw-canvas-wrap">
               <img class="draw-paper" src="assets/graph-paper.png" alt="Blank laboratory graph paper" width="803" height="1141" loading="lazy">

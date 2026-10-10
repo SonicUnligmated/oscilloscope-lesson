@@ -119,7 +119,7 @@
           "The total number of channels available on the instrument"
         ],
         "correct": 0,
-        "explain": "A division is one square of the graticule. You count vertical divisions for voltage and horizontal divisions for time, then multiply by the scale settings. It is not the full CRT height, probe length, or channel count."
+        "explain": "A division is one square of the graticule. Count vertical divisions for voltage and horizontal divisions for time, then multiply by the scale settings. It is not the full CRT height, probe length, or channel count."
       },
       {
         "id": "OSC015",
@@ -265,12 +265,12 @@
         "id": "OSC028",
         "type": "mcq",
         "cat": "osc_lab_procedure",
-        "q": "A student measures T = 0.66 ms and writes f = 1 / 0.66 = 1.51 Hz. What went wrong?",
+        "q": "T = 0.66 ms, and f is written as 1 / 0.66 = 1.51 Hz. What went wrong?",
         "options": [
           "T was not converted to seconds first; 0.66 ms = 6.6 × 10⁻⁴ s, so f ≈ 1515 Hz",
           "Nothing — 1.51 Hz is the correct frequency",
           "Frequency should be T / 2, not 1 / T",
-          "The student should have multiplied T by volts/div"
+          "T should have been multiplied by volts/div"
         ],
         "correct": 0,
         "explain": "f = 1/T needs T in seconds. 0.66 ms = 0.66 × 10⁻³ s = 6.6 × 10⁻⁴ s, so f = 1 / (6.6 × 10⁻⁴) ≈ 1515 Hz. Dividing by 0.66 (milliseconds) gives a value 1000× too small."
