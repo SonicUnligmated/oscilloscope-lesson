@@ -18,7 +18,7 @@ Site-wide Practical colorful live theme (scanline / phosphor / waveform beams). 
 5. Formulas & results (merged — worked values match Trace)
 6. Trace waveforms (example traces always visible)
 7. MCQs (scrollable full bank — select / feedback / explanations)
-8. Practical (final — free hover teaching + guided calc + draw-graph stroke MCQ)
+8. Practical (final — live CRO with VOLTS/DIV, TIME/DIV, X-POS, Y-POS knobs + function generator (amplitude, frequency, wave), "Enter my readings", hover teaching, guided calc with ms→s step, draw-graph stroke MCQ)
 
 ## Local preview (optional)
 

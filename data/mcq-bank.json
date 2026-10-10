@@ -153,29 +153,29 @@
         "id": "OSC020",
         "type": "mcq",
         "cat": "osc_lab_procedure",
-        "q": "With Y = 3.0 div and volts/div = 2 V/div, what is Vpp?",
+        "q": "With Y = 3.7 div and volts/div = 0.5 V/div, what is Vpp?",
         "options": [
-          "6.0 V peak-to-peak",
-          "3.0 V peak-to-peak",
-          "1.5 V peak-to-peak",
-          "5.0 V peak-to-peak"
+          "1.85 V peak-to-peak",
+          "3.7 V peak-to-peak",
+          "0.925 V peak-to-peak",
+          "7.4 V peak-to-peak"
         ],
         "correct": 0,
-        "explain": "Vpp = Y × volts/div = 3.0 × 2 = 6.0 V. Amplitude would then be A = 6.0 / 2 = 3.0 V."
+        "explain": "Vpp = Y × volts/div = 3.7 × 0.5 = 1.85 V. Amplitude would then be A = 1.85 / 2 = 0.925 V."
       },
       {
         "id": "OSC021",
         "type": "mcq",
         "cat": "osc_lab_procedure",
-        "q": "With X = 4.0 div and time/div = 1 ms/div, what are T and f?",
+        "q": "With X = 3.3 div and time/div = 0.2 ms/div, what are T and f?",
         "options": [
-          "T = 4.0 ms and f = 250 Hz",
-          "T = 4.0 s and f = 0.25 Hz",
-          "T = 1.0 ms and f = 1000 Hz",
-          "T = 8.0 ms and f = 125 Hz"
+          "T = 0.66 ms = 6.6 × 10⁻⁴ s and f ≈ 1515 Hz",
+          "T = 0.66 s and f ≈ 1.52 Hz",
+          "T = 3.3 ms and f ≈ 303 Hz",
+          "T = 0.2 ms and f = 5000 Hz"
         ],
         "correct": 0,
-        "explain": "T = 4.0 × 1 ms = 4.0 ms = 0.004 s. Then f = 1 / 0.004 = 250 Hz."
+        "explain": "T = 3.3 × 0.2 ms = 0.66 ms = 6.6 × 10⁻⁴ s. Then f = 1 / (6.6 × 10⁻⁴ s) ≈ 1515 Hz."
       },
       {
         "id": "OSC022",
@@ -265,15 +265,15 @@
         "id": "OSC028",
         "type": "mcq",
         "cat": "osc_lab_procedure",
-        "q": "After measuring Vpp = 6.0 V, what is the amplitude A?",
+        "q": "A student measures T = 0.66 ms and writes f = 1 / 0.66 = 1.51 Hz. What went wrong?",
         "options": [
-          "3.0 V",
-          "6.0 V",
-          "12.0 V",
-          "0.167 V"
+          "T was not converted to seconds first; 0.66 ms = 6.6 × 10⁻⁴ s, so f ≈ 1515 Hz",
+          "Nothing — 1.51 Hz is the correct frequency",
+          "Frequency should be T / 2, not 1 / T",
+          "The student should have multiplied T by volts/div"
         ],
         "correct": 0,
-        "explain": "A = Vpp / 2 = 6.0 / 2 = 3.0 V. Leaving A = Vpp, doubling, or taking 1/Vpp are incorrect."
+        "explain": "f = 1/T needs T in seconds. 0.66 ms = 0.66 × 10⁻³ s = 6.6 × 10⁻⁴ s, so f = 1 / (6.6 × 10⁻⁴) ≈ 1515 Hz. Dividing by 0.66 (milliseconds) gives a value 1000× too small."
       }
     ]
   }

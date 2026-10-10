@@ -383,74 +383,270 @@
     });
   }
 
-  /* —— Practical — chart inspection + live teaching formulas —— */
-  const INSPECT = {
-    vdiv: {
-      title: 'Volts / div',
-      body: 'Vertical scale. Each numbered vertical square is worth this many volts.',
-      formula: 'volts/div = 2 V/div',
-      mark: 'vdiv',
-      highlightField: 'vpp',
-      teach: 'vdiv',
-      pop: 'volts/div = 2 V/div'
-    },
-    tdiv: {
-      title: 'Time / div',
-      body: 'Horizontal scale. Each numbered horizontal square is worth this much time.',
-      formula: 'time/div = 1 ms/div',
-      mark: 'tdiv',
-      highlightField: 'tms',
-      teach: 'tdiv',
-      pop: 'time/div = 1 ms/div'
-    },
-    ydiv: {
-      title: 'Y divisions (peak-to-peak)',
-      body: 'Count vertical squares from trough to crest. That count is Y.',
-      formula: 'Y = 3.0 div → Vpp = 3.0 × 2 = 6.0 V',
-      mark: 'ydiv',
-      highlightField: 'vpp',
-      teach: 'vpp',
-      pop: 'Y = 3.0 div',
-      plug: 'y'
-    },
-    xdiv: {
-      title: 'X divisions (one period)',
-      body: 'Count horizontal squares spanning one full cycle. That count is X.',
-      formula: 'X = 4.0 div → T = 4.0 × 1 ms = 4.0 ms',
-      mark: 'xdiv',
-      highlightField: 'tms',
-      teach: 't',
-      pop: 'X = 4.0 div',
-      plug: 'x'
-    },
-    peak: {
-      title: 'Peak',
-      body: 'Highest (or lowest) point of the trace. Peak-to-peak spans both extremes.',
-      formula: 'A = Vpp / 2 = 3.0 V',
-      mark: 'peak',
-      highlightField: 'a',
-      teach: 'a',
-      pop: 'A = Vpp / 2'
-    },
-    wave: {
-      title: 'Waveform',
-      body: 'Voltage versus time. Use Y for amplitude and X for period.',
-      formula: 'f = 1/T = 250 Hz',
-      mark: 'wave',
-      highlightField: 'f',
-      teach: 'f',
-      pop: 'f = 1/T'
-    },
-    div: {
-      title: 'One division',
-      body: 'A single graticule square — the unit you count. Vertical divs × volts/div → volts; horizontal divs × time/div → time.',
-      formula: '1 div = one grid square',
-      mark: 'div',
-      highlightField: null,
-      teach: null,
-      pop: '1 div = 1 grid square'
+  /* —— Practical — live CRO: generator + front-panel knobs + inspection + calc —— */
+  const SCR = { x0: 56, x1: 616, y0: 50, y1: 306, cx: 336, cy: 178, divx: 56, divy: 32 };
+  const VDIV_STEPS = [0.1, 0.2, 0.5, 1, 2, 5];
+  const TDIV_STEPS = [0.05, 0.1, 0.2, 0.5, 1, 2];
+  const LAB = { wave: 'tri', vpp: 1.85, freq: 1000 / 0.66, vdiv: 0.5, tdiv: 0.2, xpos: 0, ypos: 0 };
+  const S = Object.assign({}, LAB);
+  const TRIG_DIV = -4;            // trigger point sits on the −4 gridline when X-POS = 0
+  const vdivSteps = VDIV_STEPS.slice();
+  const tdivSteps = TDIV_STEPS.slice();
+
+  function trimNum(x, d) {
+    if (!isFinite(x)) return '—';
+    let s = Number(x).toFixed(d);
+    if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return s;
+  }
+  function round2(x) { return Math.round(x * 100) / 100; }
+  const SUP = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+  function sci(x) {
+    if (!x || !isFinite(x)) return String(x);
+    let e = Math.floor(Math.log10(Math.abs(x)));
+    let m = x / Math.pow(10, e);
+    m = parseFloat(m.toPrecision(3));
+    if (m >= 10) { m /= 10; e += 1; }
+    if (e === 0) return trimNum(m, 3);
+    return trimNum(m, 3) + ' × 10' + String(e).split('').map(c => SUP[c] || c).join('');
+  }
+  function fmtV(v) { return trimNum(v, v < 1 ? 3 : 2); }
+  function fmtF(f) { return f >= 100 ? trimNum(f, 2) : trimNum(f, 3); }
+  function fmtFshort(f) { return f >= 100 ? String(Math.round(f)) : trimNum(f, 2); }
+  function periodMs() { return 1000 / S.freq; }
+  function readY() { return S.vpp / S.vdiv; }
+  function readX() { return periodMs() / S.tdiv; }
+  function waveName(w) { return w === 'sine' ? 'sine' : w === 'square' ? 'square' : 'triangular'; }
+
+  // normalised wave shape, phase p in [0,1)
+  function shape(p) {
+    p = p - Math.floor(p);
+    if (S.wave === 'sine') return Math.sin(2 * Math.PI * p);
+    if (S.wave === 'square') return p < 0.5 ? 1 : -1;
+    if (p < 0.25) return 4 * p;
+    if (p < 0.75) return 2 - 4 * p;
+    return 4 * p - 4;
+  }
+  function geom() {
+    const Pdiv = readX();
+    const Ppx = Pdiv * SCR.divx;
+    const trigX = SCR.cx + (TRIG_DIV + S.xpos) * SCR.divx;
+    const midY = SCR.cy - S.ypos * SCR.divy;
+    const ampPx = (readY() / 2) * SCR.divy;
+    return { Pdiv, Ppx, trigX, midY, ampPx };
+  }
+  function yAt(x, g) {
+    const p = (x - g.trigX) / g.Ppx;
+    return g.midY - g.ampPx * shape(p);
+  }
+  // Points of the trace over [xa, xb]; square edges drawn as vertical jumps
+  function tracePoints(xa, xb, g) {
+    const pts = [];
+    const step = Math.max(0.5, Math.min(2, g.Ppx / 60));
+    for (let x = xa; x <= xb + 0.001; x += step) {
+      const y = yAt(x, g);
+      if (S.wave === 'square' && pts.length) {
+        const prev = pts[pts.length - 1];
+        if (Math.abs(prev[1] - y) > g.ampPx) pts.push([x, prev[1]]);
+      }
+      pts.push([x, y]);
     }
-  };
+    return pts;
+  }
+  function ptsToD(pts) {
+    let d = '';
+    for (let i = 0; i < pts.length; i++) {
+      const y = Math.max(-2000, Math.min(2000, pts[i][1]));
+      d += (i ? 'L' : 'M') + pts[i][0].toFixed(1) + ' ' + y.toFixed(1);
+    }
+    return d;
+  }
+
+  // —— live SVG trace (redrawn every animation frame) ——
+  const NS = 'http://www.w3.org/2000/svg';
+  const dynTrace = document.getElementById('dyn-trace');
+  const dynGuides = document.getElementById('dyn-guides');
+  const dynMarks = document.getElementById('dyn-marks');
+  const dynHits = document.getElementById('dyn-hits');
+  let traceBase = null, traceGlow = null, traceBeam = null, beamDot = null;
+  if (dynTrace) {
+    traceGlow = document.createElementNS(NS, 'path');
+    traceGlow.setAttribute('id', 'trace-glow');
+    traceGlow.setAttribute('fill', 'none');
+    traceGlow.setAttribute('stroke', '#7ec8a8');
+    traceGlow.setAttribute('stroke-width', '6');
+    traceGlow.setAttribute('stroke-linejoin', 'round');
+    traceGlow.setAttribute('opacity', '0.16');
+    traceBase = document.createElementNS(NS, 'path');
+    traceBase.setAttribute('id', 'wave-trace');
+    traceBase.setAttribute('fill', 'none');
+    traceBase.setAttribute('stroke', '#7ec8a8');
+    traceBase.setAttribute('stroke-width', '2.2');
+    traceBase.setAttribute('stroke-linejoin', 'round');
+    traceBase.setAttribute('filter', 'url(#glow)');
+    traceBeam = document.createElementNS(NS, 'path');
+    traceBeam.setAttribute('id', 'trace-beam');
+    traceBeam.setAttribute('fill', 'none');
+    traceBeam.setAttribute('stroke', '#c8ffe6');
+    traceBeam.setAttribute('stroke-width', '2.8');
+    traceBeam.setAttribute('stroke-linejoin', 'round');
+    traceBeam.setAttribute('filter', 'url(#glow)');
+    beamDot = document.createElementNS(NS, 'circle');
+    beamDot.setAttribute('r', '3.2');
+    beamDot.setAttribute('fill', '#eafff5');
+    beamDot.setAttribute('filter', 'url(#glow)');
+    dynTrace.append(traceGlow, traceBase, traceBeam, beamDot);
+  }
+  const SWEEP_MS = 1400;
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let lastFrameKey = '';
+  function frame(now) {
+    if (traceBase) {
+      const g = geom();
+      const key = [S.wave, S.vpp, S.freq, S.vdiv, S.tdiv, S.xpos, S.ypos].join('|');
+      if (key !== lastFrameKey) {
+        const d = ptsToD(tracePoints(SCR.x0, SCR.x1, g));
+        traceBase.setAttribute('d', d);
+        traceGlow.setAttribute('d', d);
+        lastFrameKey = key;
+      }
+      // Sweep: beam runs left → right; the trail behind it is brighter (phosphor afterglow)
+      const u = reduceMotion ? 1 : (now % SWEEP_MS) / SWEEP_MS;
+      const head = SCR.x0 + u * (SCR.x1 - SCR.x0);
+      const tail = Math.max(SCR.x0, head - 150);
+      traceBeam.setAttribute('d', head - tail > 1 ? ptsToD(tracePoints(tail, head, g)) : '');
+      traceBeam.setAttribute('opacity', reduceMotion ? '0' : '0.95');
+      beamDot.setAttribute('cx', head.toFixed(1));
+      beamDot.setAttribute('cy', Math.max(-50, Math.min(410, yAt(head, g))).toFixed(1));
+      beamDot.setAttribute('opacity', reduceMotion ? '0' : '1');
+      // persistence: base trace fades slightly just ahead of the beam
+      traceBase.setAttribute('opacity', (0.62 + 0.18 * Math.cos(u * Math.PI * 2)).toFixed(2));
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // —— brackets, peak marks and hit areas (rebuilt whenever a setting changes) ——
+  const MONO = 'IBM Plex Mono, monospace';
+  function svgLabel(x, y, text, anchor) {
+    const w = text.length * 7.9 + 10;
+    const rx = anchor === 'end' ? x - w + 5 : anchor === 'middle' ? x - w / 2 : x - 5;
+    return '<rect x="' + rx.toFixed(1) + '" y="' + (y - 14) + '" width="' + w.toFixed(1) + '" height="19" rx="3" fill="rgba(15,20,25,0.88)"/>' +
+      '<text x="' + x.toFixed(1) + '" y="' + y + '" text-anchor="' + (anchor || 'start') + '" fill="#d4b06a" font-family="' + MONO + '" font-size="13" font-weight="600">' + text + '</text>';
+  }
+  let markState = { peakX: 0, peakY: 0, troughX: 0, troughY: 0, cycA: 0, cycB: 0, overflowV: false, overflowX: false };
+  function renderMarks() {
+    if (!dynMarks) return;
+    const g = geom();
+    // first full cycle starting on screen
+    let k = Math.ceil((SCR.x0 - g.trigX) / g.Ppx - 1e-9);
+    let cycA = g.trigX + k * g.Ppx;
+    const cycB = cycA + g.Ppx;
+    const peakX = S.wave === 'square' ? cycA + g.Ppx * 0.22 : cycA + g.Ppx * 0.25;
+    const troughX = S.wave === 'square' ? cycA + g.Ppx * 0.72 : cycA + g.Ppx * 0.75;
+    const peakY = g.midY - g.ampPx, troughY = g.midY + g.ampPx;
+    const overflowV = peakY < SCR.y0 - 0.5 || troughY > SCR.y1 + 0.5;
+    const overflowX = cycB > SCR.x1 + 0.5;
+    markState = { peakX, peakY, troughX, troughY, cycA, cycB, overflowV, overflowX };
+    const Y = readY(), X = readX();
+    const cpy = v => Math.max(SCR.y0, Math.min(SCR.y1, v));
+    const cpx = v => Math.max(SCR.x0, Math.min(SCR.x1, v));
+    const bx = cpx(peakX);
+    // X bracket: below the trough if room, else above the crest
+    let xb = troughY + 20;
+    if (xb > SCR.y1 - 6) xb = peakY - 14;
+    xb = Math.max(SCR.y0 + 18, Math.min(SCR.y1 - 6, xb));
+    // labels sit outside the wave envelope so they never cross the trace
+    const xLabelY = (xb > troughY && xb + 20 <= SCR.y1 - 2) ? xb + 20 : (xb < peakY && xb - 10 >= SCR.y0 + 14 ? xb - 10 : xb + (xb > SCR.cy ? -8 : 20));
+    const yLabelX = bx + 12;
+    let yLabelY = peakY - 12;
+    if (yLabelY < SCR.y0 + 16) yLabelY = troughY + 22;
+    if (Math.abs(yLabelY - xLabelY) < 20 || Math.abs(yLabelY - xb) < 12 || yLabelY > SCR.y1 - 2) yLabelY = cpy(g.midY) + 5;
+    yLabelY = Math.round(Math.max(SCR.y0 + 16, Math.min(SCR.y1 - 4, yLabelY)));
+    let html = '';
+    html += '<g class="inspect-mark" data-mark="ydiv" opacity="0">' +
+      '<line x1="' + bx.toFixed(1) + '" y1="' + cpy(peakY).toFixed(1) + '" x2="' + bx.toFixed(1) + '" y2="' + cpy(troughY).toFixed(1) + '" stroke="#d4b06a" stroke-width="2" stroke-dasharray="5 3"/>' +
+      '<line x1="' + (bx - 8).toFixed(1) + '" y1="' + cpy(peakY).toFixed(1) + '" x2="' + (bx + 8).toFixed(1) + '" y2="' + cpy(peakY).toFixed(1) + '" stroke="#d4b06a" stroke-width="2"/>' +
+      '<line x1="' + (bx - 8).toFixed(1) + '" y1="' + cpy(troughY).toFixed(1) + '" x2="' + (bx + 8).toFixed(1) + '" y2="' + cpy(troughY).toFixed(1) + '" stroke="#d4b06a" stroke-width="2"/>' +
+      svgLabel(yLabelX, yLabelY, 'Y = ' + trimNum(round2(Y), 2) + ' div', 'start') + '</g>';
+    html += '<g class="inspect-mark" data-mark="xdiv" opacity="0">' +
+      '<line x1="' + cpx(cycA).toFixed(1) + '" y1="' + xb.toFixed(1) + '" x2="' + cpx(cycB).toFixed(1) + '" y2="' + xb.toFixed(1) + '" stroke="#d4b06a" stroke-width="2"/>' +
+      '<line x1="' + cpx(cycA).toFixed(1) + '" y1="' + (xb - 6).toFixed(1) + '" x2="' + cpx(cycA).toFixed(1) + '" y2="' + (xb + 6).toFixed(1) + '" stroke="#d4b06a" stroke-width="2"/>' +
+      (cycB <= SCR.x1 ? '<line x1="' + cycB.toFixed(1) + '" y1="' + (xb - 6).toFixed(1) + '" x2="' + cycB.toFixed(1) + '" y2="' + (xb + 6).toFixed(1) + '" stroke="#d4b06a" stroke-width="2"/>' : '') +
+      svgLabel(cpx((cpx(cycA) + cpx(cycB)) / 2), Math.round(xLabelY), 'X = ' + trimNum(round2(X), 2) + ' div', 'middle') + '</g>';
+    html += '<g class="inspect-mark" data-mark="peak" opacity="0">' +
+      (peakY >= SCR.y0 && peakX <= SCR.x1 ? '<circle cx="' + peakX.toFixed(1) + '" cy="' + peakY.toFixed(1) + '" r="7" fill="none" stroke="#c8ffe6" stroke-width="2"/>' : '') +
+      (troughY <= SCR.y1 && troughX <= SCR.x1 ? '<circle cx="' + troughX.toFixed(1) + '" cy="' + troughY.toFixed(1) + '" r="7" fill="none" stroke="#c8ffe6" stroke-width="2"/>' : '') + '</g>';
+    html += '<g class="inspect-mark" data-mark="wave" opacity="0"><use href="#wave-trace" stroke="#a8e8c8" stroke-width="5" opacity="0.35"/></g>';
+    dynMarks.innerHTML = html;
+    // faint level guides at crest and trough while Y is inspected
+    if (dynGuides) {
+      dynGuides.innerHTML = '<g class="inspect-mark" data-mark="ydiv-guides" opacity="0">' +
+        '<line x1="56" x2="616" y1="' + peakY.toFixed(1) + '" y2="' + peakY.toFixed(1) + '" stroke="#d4b06a" stroke-width="1" stroke-dasharray="2 4" opacity="0.6"/>' +
+        '<line x1="56" x2="616" y1="' + troughY.toFixed(1) + '" y2="' + troughY.toFixed(1) + '" stroke="#d4b06a" stroke-width="1" stroke-dasharray="2 4" opacity="0.6"/></g>';
+    }
+    if (dynHits) {
+      const ht = cpy(peakY) - 10, hb = cpy(troughY) + 10;
+      dynHits.innerHTML =
+        '<path class="chart-hit" data-inspect="wave" d="' + ptsToD(tracePoints(SCR.x0, SCR.x1, g)) + '" fill="none" stroke="transparent" stroke-width="18"/>' +
+        '<rect class="chart-hit" data-inspect="ydiv" x="' + (bx - 22).toFixed(1) + '" y="' + ht.toFixed(1) + '" width="44" height="' + Math.max(20, hb - ht).toFixed(1) + '" fill="transparent"/>' +
+        '<rect class="chart-hit" data-inspect="xdiv" x="' + (cpx(cycA) - 8).toFixed(1) + '" y="' + (Math.min(xb, xLabelY) - 16).toFixed(1) + '" width="' + (cpx(cycB) - cpx(cycA) + 16).toFixed(1) + '" height="' + (Math.abs(xb - xLabelY) + 26).toFixed(1) + '" fill="transparent"/>' +
+        (peakY >= SCR.y0 ? '<rect class="chart-hit" data-inspect="peak" x="' + (peakX - 14).toFixed(1) + '" y="' + (peakY - 14).toFixed(1) + '" width="28" height="28" fill="transparent"/>' : '');
+    }
+    // readouts on/around the screen
+    const vText = trimNum(S.vdiv, 3) + ' V/div', tText = trimNum(S.tdiv, 3) + ' ms/div';
+    setText('mark-vdiv-text', vText);
+    setText('mark-tdiv-text', 'TIME/DIV = ' + tText);
+    setText('scope-status', 'CH1 ' + trimNum(S.vdiv, 3) + ' V · M ' + trimNum(S.tdiv, 3) + ' ms');
+    setText('eq-vdiv-val', vText);
+    setText('eq-tdiv-val', tText);
+    const hint = document.getElementById('offscreen-hint');
+    if (hint) {
+      let msg = '';
+      if (overflowV) msg = 'Trace off-screen · turn VOLTS/DIV up (or recentre Y-POS)';
+      else if (overflowX) msg = 'Full period off-screen · turn TIME/DIV up (or move X-POS)';
+      hint.textContent = msg;
+      hint.setAttribute('visibility', msg ? 'visible' : 'hidden');
+    }
+    reapplyMarks();
+  }
+  function setText(id, t) { const el = document.getElementById(id); if (el) el.textContent = t; }
+
+  let activeMarks = [];
+  function setMarks(list) {
+    activeMarks = list || [];
+    reapplyMarks();
+  }
+  function reapplyMarks() {
+    document.querySelectorAll('#cro-stage .inspect-mark').forEach(m => {
+      const mk = m.getAttribute('data-mark');
+      const on = activeMarks.indexOf(mk) >= 0 || (mk === 'ydiv-guides' && activeMarks.indexOf('ydiv') >= 0);
+      m.classList.toggle('on', on);
+    });
+  }
+
+  /* —— inspection copy (computed from the live settings) —— */
+  function inspectInfo(key) {
+    const Y = round2(readY()), X = round2(readX());
+    const vpp = Y * S.vdiv, tms = X * S.tdiv;
+    const map = {
+      vdiv: { title: 'Volts / div', body: 'Vertical scale. Each vertical square is worth this many volts. Turn the VOLTS/DIV knob to change it.',
+        formula: 'volts/div = ' + trimNum(S.vdiv, 3) + ' V/div', mark: 'vdiv', highlightField: 'vpp', teach: 'vdiv', pop: 'volts/div = ' + trimNum(S.vdiv, 3) + ' V/div' },
+      tdiv: { title: 'Time / div', body: 'Horizontal scale. Each horizontal square is worth this much time. Turn the TIME/DIV knob to change it.',
+        formula: 'time/div = ' + trimNum(S.tdiv, 3) + ' ms/div', mark: 'tdiv', highlightField: 'tms', teach: 'tdiv', pop: 'time/div = ' + trimNum(S.tdiv, 3) + ' ms/div' },
+      ydiv: { title: 'Y divisions (peak-to-peak)', body: 'Count vertical squares from trough to crest. That count is Y.',
+        formula: 'Y = ' + trimNum(Y, 2) + ' div → Vpp = ' + trimNum(Y, 2) + ' × ' + trimNum(S.vdiv, 3) + ' = ' + fmtV(vpp) + ' V', mark: 'ydiv', highlightField: 'vpp', teach: 'vpp', pop: 'Y = ' + trimNum(Y, 2) + ' div', plug: 'y' },
+      xdiv: { title: 'X divisions (one period)', body: 'Count horizontal squares spanning one full cycle. That count is X.',
+        formula: 'X = ' + trimNum(X, 2) + ' div → T = ' + trimNum(X, 2) + ' × ' + trimNum(S.tdiv, 3) + ' ms = ' + trimNum(tms, 4) + ' ms', mark: 'xdiv', highlightField: 'tms', teach: 't', pop: 'X = ' + trimNum(X, 2) + ' div', plug: 'x' },
+      peak: { title: 'Peak', body: 'Highest (or lowest) point of the trace. Peak-to-peak spans both extremes.',
+        formula: 'A = Vpp / 2 = ' + fmtV(vpp / 2) + ' V', mark: 'peak', highlightField: 'a', teach: 'a', pop: 'A = Vpp / 2' },
+      wave: { title: 'Waveform', body: 'Voltage versus time. Use Y for amplitude and X for period.',
+        formula: 'f = 1/T = 1/(' + sci(tms / 1000) + ' s) ≈ ' + fmtFshort(1000 / tms) + ' Hz', mark: 'wave', highlightField: 'f', teach: 'f', pop: 'f = 1/T' },
+      div: { title: 'One division', body: 'A single graticule square — the unit you count. Vertical divs × volts/div → volts; horizontal divs × time/div → time.',
+        formula: '1 div = one grid square', mark: 'div', highlightField: null, teach: null, pop: '1 div = 1 grid square' }
+    };
+    return map[key];
+  }
 
   const vrTitle = document.getElementById('vr-title');
   const vrBody = document.getElementById('vr-body');
@@ -460,37 +656,19 @@
   const teachHint = document.getElementById('teach-hint');
   const slotY = document.getElementById('slot-y');
   const slotX = document.getElementById('slot-x');
-  const eqVpp = document.getElementById('eq-vpp');
-  const eqT = document.getElementById('eq-t');
-  const PRAC_MAP = {
-    ox: 336, oy: 178, divx: 56, divy: 32,
-    vPerDiv: 2, tPerDiv: 1, vUnit: 'V', tUnit: 'ms'
-  };
-  const WORKED = { Y: 3.0, X: 4.0, vdiv: 2, tdiv: 1 };
+  const TEACH_DEFAULT = 'Hover the chart — a matching quantity lights its formula. Hover Y or X to plug the live count into the equation.';
 
   function resetSlots() {
-    if (slotY) {
-      slotY.textContent = 'Y';
-      slotY.classList.remove('live');
-    }
-    if (slotX) {
-      slotX.textContent = 'X';
-      slotX.classList.remove('live');
-    }
+    if (slotY) { slotY.textContent = 'Y'; slotY.classList.remove('live'); }
+    if (slotX) { slotX.textContent = 'X'; slotX.classList.remove('live'); }
   }
-
   function clearTeach() {
-    document.querySelectorAll('.teach-row').forEach(r => {
-      r.classList.remove('active', 'hot');
-    });
+    document.querySelectorAll('.teach-row').forEach(r => r.classList.remove('active', 'hot'));
     resetSlots();
-    if (teachHint) {
-      teachHint.textContent = 'Hover the chart — a matching quantity lights its formula. Hover Y or X to plug the live count into the equation.';
-    }
+    if (teachHint) teachHint.textContent = TEACH_DEFAULT;
   }
-
   function clearInspect() {
-    document.querySelectorAll('#cro-stage .inspect-mark').forEach(m => m.classList.remove('on'));
+    setMarks([]);
     document.querySelectorAll('.calc-field').forEach(f => f.classList.remove('awake'));
     if (vrTitle) vrTitle.textContent = 'CRO screen';
     if (vrBody) vrBody.textContent = 'Move over the wave, peaks, Y/X brackets, a single division, or the volts/div and time/div regions.';
@@ -498,65 +676,45 @@
     if (formulaPop) formulaPop.hidden = true;
     clearTeach();
   }
-
-  function showInspect(key, clientX, clientY) {
-    const info = INSPECT[key];
-    if (!info) return;
-    document.querySelectorAll('#cro-stage .inspect-mark').forEach(m => {
-      m.classList.toggle('on', m.getAttribute('data-mark') === info.mark);
+  function lightTeach(teach, plug) {
+    document.querySelectorAll('.teach-row').forEach(r => {
+      const match = teach && r.getAttribute('data-formula') === teach;
+      r.classList.toggle('active', !!match);
+      r.classList.toggle('hot', !!match && !!plug);
     });
+    if (teach === 'vpp') { const r = document.querySelector('.teach-row[data-formula="vdiv"]'); if (r) r.classList.add('active'); }
+    if (teach === 't') { const r = document.querySelector('.teach-row[data-formula="tdiv"]'); if (r) r.classList.add('active'); }
+    resetSlots();
+    if (plug === 'y' && slotY) { slotY.textContent = trimNum(round2(readY()), 2); slotY.classList.add('live'); }
+    if (plug === 'x' && slotX) { slotX.textContent = trimNum(round2(readX()), 2); slotX.classList.add('live'); }
+  }
+
+  let lastInspectKey = null;
+  function showInspect(key, clientX, clientY) {
+    const info = inspectInfo(key);
+    if (!info) return;
+    lastInspectKey = key;
+    setMarks([info.mark]);
     if (vrTitle) vrTitle.textContent = info.title;
     if (vrBody) vrBody.textContent = info.body;
     if (vrFormula) vrFormula.textContent = info.formula;
     document.querySelectorAll('.calc-field').forEach(f => {
-      f.classList.toggle('awake', info.highlightField && f.getAttribute('data-key') === info.highlightField);
+      f.classList.toggle('awake', !!info.highlightField && f.getAttribute('data-key') === info.highlightField);
     });
-
-    // Under-chart formulas
-    document.querySelectorAll('.teach-row').forEach(r => {
-      const match = info.teach && r.getAttribute('data-formula') === info.teach;
-      r.classList.toggle('active', !!match);
-      r.classList.toggle('hot', !!match && !!info.plug);
-    });
-    // Also light volts/div when Y/Vpp is in play
-    if (info.teach === 'vpp') {
-      const vrow = document.querySelector('.teach-row[data-formula="vdiv"]');
-      if (vrow) vrow.classList.add('active');
+    lightTeach(info.teach, info.plug);
+    const Y = round2(readY()), X = round2(readX());
+    if (teachHint) {
+      if (info.plug === 'y') teachHint.textContent = 'Y is live in the formula → Vpp = ' + trimNum(Y, 2) + ' × ' + trimNum(S.vdiv, 3) + ' = ' + fmtV(Y * S.vdiv) + ' V.';
+      else if (info.plug === 'x') teachHint.textContent = 'X is live in the formula → T = ' + trimNum(X, 2) + ' × ' + trimNum(S.tdiv, 3) + ' ms = ' + trimNum(X * S.tdiv, 4) + ' ms = ' + sci(X * S.tdiv / 1000) + ' s.';
+      else if (key === 'div') teachHint.textContent = 'A division is one grid square. Count them: vertical for Y (voltage), horizontal for X (time).';
+      else if (info.teach === 'vdiv') teachHint.textContent = 'volts/div tells you what each vertical square is worth. Here every vertical div = ' + trimNum(S.vdiv, 3) + ' V.';
+      else if (info.teach === 'tdiv') teachHint.textContent = 'time/div tells you what each horizontal square is worth. Here every horizontal div = ' + trimNum(S.tdiv, 3) + ' ms.';
+      else teachHint.textContent = info.body;
     }
-    if (info.teach === 't') {
-      const trow = document.querySelector('.teach-row[data-formula="tdiv"]');
-      if (trow) trow.classList.add('active');
-    }
-
-    resetSlots();
-    if (info.plug === 'y' && slotY) {
-      slotY.textContent = String(WORKED.Y);
-      slotY.classList.add('live');
-      if (teachHint) {
-        teachHint.textContent = 'Y is live in the formula → Vpp = ' + WORKED.Y + ' × ' + WORKED.vdiv + ' = ' + (WORKED.Y * WORKED.vdiv).toFixed(1) + ' V.';
-      }
-    } else if (info.plug === 'x' && slotX) {
-      slotX.textContent = String(WORKED.X);
-      slotX.classList.add('live');
-      if (teachHint) {
-        teachHint.textContent = 'X is live in the formula → T = ' + WORKED.X + ' × ' + WORKED.tdiv + ' ms = ' + (WORKED.X * WORKED.tdiv).toFixed(1) + ' ms.';
-      }
-    } else if (key === 'div' && teachHint) {
-      teachHint.textContent = 'A division is one grid square. Count them: vertical for Y (voltage), horizontal for X (time).';
-    } else if (info.teach === 'vdiv' && teachHint) {
-      teachHint.textContent = 'volts/div tells you what each vertical square is worth. Here every vertical div = 2 V.';
-    } else if (info.teach === 'tdiv' && teachHint) {
-      teachHint.textContent = 'time/div tells you what each horizontal square is worth. Here every horizontal div = 1 ms.';
-    } else if (teachHint && info.pop) {
-      teachHint.textContent = info.body;
-    }
-
-    // Pop above live x/y
-    if (formulaPop && info.pop) {
+    if (formulaPop && info.pop && clientX != null) {
       formulaPop.hidden = false;
       formulaPop.textContent = info.pop;
-      const stage = document.getElementById('cro-stage');
-      const r = stage.getBoundingClientRect();
+      const r = document.getElementById('cro-stage').getBoundingClientRect();
       formulaPop.style.left = (clientX - r.left) + 'px';
       formulaPop.style.top = (clientY - r.top) + 'px';
     }
@@ -568,68 +726,305 @@
     croStage.addEventListener('mousemove', e => {
       const hit = e.target.closest('[data-inspect]');
       if (hit) showInspect(hit.getAttribute('data-inspect'), e.clientX, e.clientY);
-      else {
-        // keep marks cleared but still show x/y
-        document.querySelectorAll('#cro-stage .inspect-mark').forEach(m => m.classList.remove('on'));
-        document.querySelectorAll('.calc-field').forEach(f => f.classList.remove('awake'));
-        if (formulaPop) formulaPop.hidden = true;
-        clearTeach();
-        if (vrTitle) vrTitle.textContent = 'CRO screen';
-        if (vrBody) vrBody.textContent = 'Move over the wave, peaks, Y/X brackets, a single division, or the volts/div and time/div regions.';
-        if (vrFormula) vrFormula.textContent = '';
-      }
-
+      else if (guideIndex < 0) {
+        lastInspectKey = null;
+        clearInspect();
+      } else if (formulaPop) formulaPop.hidden = true;
       if (bubble && svg) {
         const p = svgPoint(svg, e.clientX, e.clientY);
-        if (!p || p.x < 56 || p.x > 616 || p.y < 50 || p.y > 306) {
-          bubble.hidden = true;
-          return;
-        }
-        const tDiv = (p.x - PRAC_MAP.ox) / PRAC_MAP.divx;
-        const vDiv = (PRAC_MAP.oy - p.y) / PRAC_MAP.divy;
-        const t = tDiv * PRAC_MAP.tPerDiv;
-        const v = vDiv * PRAC_MAP.vPerDiv;
+        if (!p || p.x < SCR.x0 || p.x > SCR.x1 || p.y < SCR.y0 || p.y > SCR.y1) { bubble.hidden = true; return; }
+        const t = ((p.x - SCR.cx) / SCR.divx) * S.tdiv;
+        const v = ((SCR.cy - p.y) / SCR.divy - S.ypos) * S.vdiv;
         bubble.hidden = false;
-        bubble.textContent = 't ' + t.toFixed(2) + ' ' + PRAC_MAP.tUnit + '  ·  V ' + v.toFixed(2) + ' ' + PRAC_MAP.vUnit;
+        bubble.textContent = 't ' + t.toFixed(2) + ' ms  ·  V ' + v.toFixed(2) + ' V';
         const r = croStage.getBoundingClientRect();
-        // Sit just under the formula-pop when both show
-        const yOff = (formulaPop && !formulaPop.hidden) ? 8 : 0;
         bubble.style.left = (e.clientX - r.left) + 'px';
-        bubble.style.top = (e.clientY - r.top + yOff) + 'px';
+        bubble.style.top = (e.clientY - r.top) + 'px';
         if (hit && formulaPop && !formulaPop.hidden) {
-          // stack: formula-pop higher, xy lower
           formulaPop.style.top = (e.clientY - r.top - 18) + 'px';
           bubble.style.top = (e.clientY - r.top + 10) + 'px';
         }
       }
     });
     croStage.addEventListener('mouseleave', () => {
-      clearInspect();
+      if (guideIndex < 0) clearInspect();
+      lastInspectKey = null;
       if (bubble) bubble.hidden = true;
       if (formulaPop) formulaPop.hidden = true;
     });
   }
 
-  /* Answer checking + guided explain (one beat at a time) */
-  const answers = {
-    vpp: { value: 6, tol: 0.15 },
-    a: { value: 3, tol: 0.15 },
-    tms: { value: 4, tol: 0.15 },
-    f: { value: 250, tol: 5 }
-  };
-  function near(v, target, tol) {
-    return typeof v === 'number' && !isNaN(v) && Math.abs(v - target) <= tol;
+  /* —— Rotary knobs (drag to rotate · wheel · arrow keys) —— */
+  const KNOB_SWEEP = 270;   // degrees, −135 … +135
+  const knobs = {};
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  function makeKnob(host, cfg) {
+    // cfg: { id, name, stepped:[...] | null, min, max, log, get(), set(v), fmt(v), fine, coarse }
+    const el = document.createElement('div');
+    el.className = 'knob';
+    el.tabIndex = 0;
+    el.setAttribute('role', 'slider');
+    el.setAttribute('aria-label', cfg.name);
+    el.dataset.knob = cfg.id;
+    const ticks = [];
+    const nT = cfg.stepped ? cfg.stepped().length : 11;
+    for (let i = 0; i < nT; i++) {
+      const a = (-135 + KNOB_SWEEP * i / (nT - 1)) * Math.PI / 180;
+      const r1 = 44, r2 = cfg.stepped ? 49 : 47.5;
+      ticks.push('<line x1="' + (50 + r1 * Math.sin(a)).toFixed(2) + '" y1="' + (50 - r1 * Math.cos(a)).toFixed(2) +
+        '" x2="' + (50 + r2 * Math.sin(a)).toFixed(2) + '" y2="' + (50 - r2 * Math.cos(a)).toFixed(2) + '"/>');
+    }
+    let ridges = '';
+    for (let i = 0; i < 24; i++) {
+      const a = i * 15 * Math.PI / 180;
+      ridges += '<line x1="' + (50 + 30 * Math.sin(a)).toFixed(2) + '" y1="' + (50 - 30 * Math.cos(a)).toFixed(2) +
+        '" x2="' + (50 + 34 * Math.sin(a)).toFixed(2) + '" y2="' + (50 - 34 * Math.cos(a)).toFixed(2) + '"/>';
+    }
+    el.innerHTML =
+      '<span class="knob-name">' + cfg.name + '</span>' +
+      '<svg class="knob-svg" viewBox="0 0 100 100" aria-hidden="true">' +
+        '<g class="knob-ticks" stroke="#5c7a9e" stroke-width="1.6" stroke-linecap="round">' + ticks.join('') + '</g>' +
+        '<circle cx="50" cy="50" r="38" fill="#0b1015" stroke="#26343e" stroke-width="1.5"/>' +
+        '<g class="knob-rot">' +
+          '<circle cx="50" cy="50" r="34" fill="url(#knobGrad-' + cfg.id + ')" stroke="#3a4a56" stroke-width="1"/>' +
+          '<g stroke="#1c262e" stroke-width="1.4">' + ridges + '</g>' +
+          '<circle cx="50" cy="50" r="24" fill="url(#knobCap-' + cfg.id + ')"/>' +
+          '<line x1="50" y1="30" x2="50" y2="18" stroke="#d4b06a" stroke-width="3.2" stroke-linecap="round"/>' +
+        '</g>' +
+        '<defs>' +
+          '<radialGradient id="knobGrad-' + cfg.id + '" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#4b5b67"/><stop offset="1" stop-color="#1a232b"/></radialGradient>' +
+          '<radialGradient id="knobCap-' + cfg.id + '" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#5d6e7a"/><stop offset="1" stop-color="#26323b"/></radialGradient>' +
+        '</defs>' +
+      '</svg>' +
+      '<span class="knob-val"></span>';
+    host.appendChild(el);
+    const rot = el.querySelector('.knob-rot');
+    const valEl = el.querySelector('.knob-val');
+
+    function valueToFrac(v) {
+      if (cfg.stepped) {
+        const arr = cfg.stepped();
+        let idx = arr.indexOf(v);
+        if (idx < 0) idx = arr.reduce((b, x, i) => Math.abs(x - v) < Math.abs(arr[b] - v) ? i : b, 0);
+        return arr.length > 1 ? idx / (arr.length - 1) : 0;
+      }
+      if (cfg.log) return (Math.log(v) - Math.log(cfg.min)) / (Math.log(cfg.max) - Math.log(cfg.min));
+      return (v - cfg.min) / (cfg.max - cfg.min);
+    }
+    function fracToValue(fr) {
+      fr = clamp(fr, 0, 1);
+      if (cfg.stepped) { const arr = cfg.stepped(); return arr[Math.round(fr * (arr.length - 1))]; }
+      let v = cfg.log ? Math.exp(Math.log(cfg.min) + fr * (Math.log(cfg.max) - Math.log(cfg.min))) : cfg.min + fr * (cfg.max - cfg.min);
+      return cfg.snap ? cfg.snap(v) : v;
+    }
+    function paint() {
+      const v = cfg.get();
+      const ang = -135 + KNOB_SWEEP * clamp(valueToFrac(v), 0, 1);
+      rot.setAttribute('transform', 'rotate(' + ang.toFixed(1) + ' 50 50)');
+      valEl.textContent = cfg.fmt(v);
+      el.setAttribute('aria-valuetext', cfg.fmt(v));
+    }
+    function commit(v) {
+      if (v === cfg.get()) return;
+      cfg.set(v);
+      onSettingsChanged();
+    }
+    function nudge(dir, big) {
+      if (cfg.stepped) {
+        const arr = cfg.stepped();
+        let idx = arr.indexOf(cfg.get());
+        if (idx < 0) idx = Math.round(valueToFrac(cfg.get()) * (arr.length - 1));
+        commit(arr[clamp(idx + dir, 0, arr.length - 1)]);
+      } else {
+        commit(cfg.nudge(cfg.get(), dir, big));
+      }
+    }
+    // drag: rotate around the knob centre
+    let drag = null;
+    function angleAt(e) {
+      const r = el.querySelector('.knob-svg').getBoundingClientRect();
+      return Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))) * 180 / Math.PI;
+    }
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      el.focus({ preventScroll: true });
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+      drag = { last: angleAt(e), frac: clamp(valueToFrac(cfg.get()), 0, 1), y: e.clientY };
+      el.classList.add('dragging');
+      document.body.classList.add('knob-grabbing');
+    });
+    el.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const a = angleAt(e);
+      let d = a - drag.last;
+      if (d > 180) d -= 360;
+      if (d < -180) d += 360;
+      // vertical drag also works (up = clockwise) for users who drag straight
+      const dy = drag.y - e.clientY;
+      drag.y = e.clientY;
+      drag.last = a;
+      const gain = e.shiftKey ? 0.25 : 1;
+      const deltaDeg = Math.abs(d) > 0.01 && Math.abs(d) < 90 ? d : 0;
+      drag.frac = clamp(drag.frac + (deltaDeg + dy * 0.6) * gain / KNOB_SWEEP, 0, 1);
+      commit(fracToValue(drag.frac));
+    });
+    function endDrag(e) {
+      if (!drag) return;
+      drag = null;
+      el.classList.remove('dragging');
+      document.body.classList.remove('knob-grabbing');
+      try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+    el.addEventListener('pointerup', endDrag);
+    el.addEventListener('pointercancel', endDrag);
+    el.addEventListener('wheel', e => {
+      e.preventDefault();
+      nudge(e.deltaY < 0 ? 1 : -1, e.shiftKey);
+    }, { passive: false });
+    el.addEventListener('keydown', e => {
+      const up = e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === 'PageUp';
+      const dn = e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'PageDown';
+      if (!up && !dn) return;
+      e.preventDefault();
+      nudge(up ? 1 : -1, e.shiftKey || e.key.indexOf('Page') === 0);
+    });
+    el.addEventListener('pointerenter', () => document.body.classList.add('knob-hover'));
+    el.addEventListener('pointerleave', () => document.body.classList.remove('knob-hover'));
+    knobs[cfg.id] = { el, paint, cfg };
+    paint();
+  }
+
+  const knobsScope = document.getElementById('knobs-scope');
+  const knobsGen = document.getElementById('knobs-gen');
+  if (knobsScope) {
+    makeKnob(knobsScope, { id: 'vdiv', name: 'VOLTS/DIV', stepped: () => vdivSteps,
+      get: () => S.vdiv, set: v => { S.vdiv = v; }, fmt: v => trimNum(v, 3) + ' V/div' });
+    makeKnob(knobsScope, { id: 'tdiv', name: 'TIME/DIV', stepped: () => tdivSteps,
+      get: () => S.tdiv, set: v => { S.tdiv = v; }, fmt: v => trimNum(v, 3) + ' ms/div' });
+    makeKnob(knobsScope, { id: 'xpos', name: 'X-POSITION', min: -5, max: 5,
+      snap: v => Math.round(v * 50) / 50, nudge: (v, d, big) => clamp(Math.round((v + d * (big ? 0.5 : 0.1)) * 50) / 50, -5, 5),
+      get: () => S.xpos, set: v => { S.xpos = v; }, fmt: v => (v > 0 ? '+' : '') + trimNum(v, 2) + ' div' });
+    makeKnob(knobsScope, { id: 'ypos', name: 'Y-POSITION', min: -4, max: 4,
+      snap: v => Math.round(v * 50) / 50, nudge: (v, d, big) => clamp(Math.round((v + d * (big ? 0.5 : 0.1)) * 50) / 50, -4, 4),
+      get: () => S.ypos, set: v => { S.ypos = v; }, fmt: v => (v > 0 ? '+' : '') + trimNum(v, 2) + ' div' });
+  }
+  const waveSelect = document.getElementById('wave-select');
+  if (knobsGen) {
+    const before = waveSelect || null;
+    const holder = document.createElement('div');
+    holder.className = 'knob-pair';
+    knobsGen.insertBefore(holder, before);
+    makeKnob(holder, { id: 'amp', name: 'AMPLITUDE', min: 0.1, max: 10,
+      snap: v => Math.round(v * 100) / 100,
+      nudge: (v, d, big) => clamp(Math.round((v + d * (big ? 0.5 : 0.05)) * 100) / 100, 0.1, 10),
+      get: () => S.vpp, set: v => { S.vpp = v; }, fmt: v => fmtV(v) + ' Vpp' });
+    makeKnob(holder, { id: 'freq', name: 'FREQUENCY', min: 20, max: 20000, log: true,
+      snap: v => parseFloat(v.toPrecision(4)),
+      nudge: (v, d, big) => clamp(parseFloat((v * Math.pow(big ? 1.05 : 1.005, d)).toPrecision(4)), 20, 20000),
+      get: () => S.freq, set: v => { S.freq = v; }, fmt: v => fmtFshort(v) + ' Hz' });
+  }
+  if (waveSelect) {
+    waveSelect.querySelectorAll('.wave-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        S.wave = b.getAttribute('data-wave');
+        onSettingsChanged();
+      });
+    });
+  }
+  function paintWaveSelect() {
+    if (!waveSelect) return;
+    waveSelect.querySelectorAll('.wave-btn').forEach(b => {
+      const on = b.getAttribute('data-wave') === S.wave;
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.classList.toggle('on', on);
+    });
+  }
+
+  function onSettingsChanged() {
+    Object.keys(knobs).forEach(k => knobs[k].paint());
+    paintWaveSelect();
+    renderMarks();
+    fillReadingsForm();
+    if (guideIndex >= 0) applyGuideBeat(buildBeats()[guideIndex]);
+    else if (lastInspectKey) showInspect(lastInspectKey);
+    const fb = document.getElementById('fb-calc');
+    const anyInput = [...document.querySelectorAll('#calc-panel input')].some(i => i.value !== '');
+    if (anyInput && fb && fb.textContent) check();
+  }
+
+  function resetScope() {
+    S.vdiv = LAB.vdiv; S.tdiv = LAB.tdiv; S.xpos = 0; S.ypos = 0;
+  }
+  const btnLabScale = document.getElementById('btn-lab-scale');
+  if (btnLabScale) btnLabScale.addEventListener('click', () => { resetScope(); onSettingsChanged(); });
+  const btnMyLab = document.getElementById('btn-my-lab');
+  if (btnMyLab) btnMyLab.addEventListener('click', () => {
+    S.wave = LAB.wave; S.vpp = LAB.vpp; S.freq = LAB.freq;
+    resetScope();
+    onSettingsChanged();
+  });
+
+  /* —— Enter my readings —— */
+  const reY = document.getElementById('re-y'), reV = document.getElementById('re-vdiv');
+  const reX = document.getElementById('re-x'), reT = document.getElementById('re-tdiv');
+  const reMsg = document.getElementById('re-msg');
+  function fillReadingsForm() {
+    const active = document.activeElement;
+    [[reY, trimNum(round2(readY()), 2)], [reV, trimNum(S.vdiv, 3)], [reX, trimNum(round2(readX()), 2)], [reT, trimNum(S.tdiv, 3)]].forEach(([el, v]) => {
+      if (el && el !== active) el.value = v;
+    });
+  }
+  function ensureStep(arr, v) {
+    if (arr.indexOf(v) < 0) { arr.push(v); arr.sort((a, b) => a - b); }
+  }
+  const reApply = document.getElementById('re-apply');
+  if (reApply) reApply.addEventListener('click', () => {
+    const y = parseFloat(reY.value), vd = parseFloat(reV.value), x = parseFloat(reX.value), td = parseFloat(reT.value);
+    if (![y, vd, x, td].every(n => isFinite(n) && n > 0)) {
+      if (reMsg) { reMsg.className = 're-msg bad'; reMsg.textContent = 'Enter four positive numbers.'; }
+      return;
+    }
+    ensureStep(vdivSteps, vd);
+    ensureStep(tdivSteps, td);
+    S.vdiv = vd; S.tdiv = td;
+    S.vpp = y * vd;
+    S.freq = 1000 / (x * td);
+    S.xpos = 0; S.ypos = 0;
+    onSettingsChanged();
+    if (reMsg) { reMsg.className = 're-msg ok'; reMsg.textContent = 'Screen redrawn: Y = ' + trimNum(y, 3) + ' div, X = ' + trimNum(x, 3) + ' div.'; }
+  });
+
+  /* —— Answer checking: graded live against the current signal (±2%) —— */
+  const tUnitSel = document.getElementById('in-tunit');
+  function within(v, target, rel) {
+    return typeof v === 'number' && isFinite(v) && Math.abs(v - target) <= Math.abs(target) * rel + 1e-12;
   }
   function check() {
+    const T = periodMs();
+    const target = { vpp: S.vpp, a: S.vpp / 2, f: S.freq };
+    const unit = tUnitSel ? tUnitSel.value : 'ms';
+    const nudges = [];
     let ok = 0, total = 0;
-    Object.keys(answers).forEach(key => {
+    ['vpp', 'a', 'tms', 'f'].forEach(key => {
       total++;
       const field = document.querySelector('.calc-field[data-key="' + key + '"]');
       if (!field) return;
       const input = field.querySelector('input');
-      let v = parseFloat(input.value);
-      let good = near(v, answers[key].value, answers[key].tol);
-      if (key === 'tms' && near(v, 0.004, 0.0003)) good = true;
+      const v = parseFloat(input.value);
+      let good = false;
+      if (key === 'tms') {
+        const want = unit === 's' ? T / 1000 : T;
+        good = within(v, want, 0.02);
+        if (!good && unit === 'ms' && within(v, T / 1000, 0.02)) nudges.push('T looks like it is in seconds — switch the unit box to “s” (or enter ' + trimNum(T, 4) + ' ms).');
+        if (!good && unit === 's' && within(v, T, 0.02)) nudges.push('T = ' + trimNum(v, 4) + ' is the millisecond value. In seconds it is ' + sci(T / 1000) + ' s (switch the unit box to “ms” to enter ms).');
+      } else {
+        good = within(v, target[key], 0.02);
+        if (key === 'f' && !good && within(v, S.freq / 1000, 0.03)) {
+          nudges.push('f ≈ ' + trimNum(v, 3) + ' means you divided 1 by T in milliseconds. Convert first: ' + trimNum(T, 4) + ' ms = ' + sci(T / 1000) + ' s, so f = 1 / (' + sci(T / 1000) + ' s) ≈ ' + fmtFshort(S.freq) + ' Hz.');
+        }
+        if (key === 'a' && !good && within(v, S.vpp, 0.02)) nudges.push('That is Vpp. Amplitude is half of it: A = Vpp / 2.');
+      }
       field.classList.toggle('ok', good);
       field.classList.toggle('bad', input.value !== '' && !good);
       if (good) ok++;
@@ -638,148 +1033,129 @@
     if (!fb) return;
     if (ok === total) {
       fb.className = 'calc-feedback ok';
-      fb.textContent = 'Match · Vpp = 6 V, A = 3 V, T = 4 ms, f = 250 Hz.';
+      fb.textContent = 'Match · Vpp = ' + fmtV(S.vpp) + ' V, A = ' + fmtV(S.vpp / 2) + ' V, T = ' + trimNum(T, 4) + ' ms = ' + sci(T / 1000) + ' s, f ≈ ' + fmtFshort(S.freq) + ' Hz.';
     } else {
       fb.className = 'calc-feedback bad';
-      fb.textContent = ok + ' of ' + total + ' correct.';
+      fb.textContent = ok + ' of ' + total + ' correct.' + (nudges.length ? ' ' + nudges.join(' ') : '');
     }
   }
   const btnCheck = document.getElementById('btn-check');
   if (btnCheck) btnCheck.addEventListener('click', check);
-  document.querySelectorAll('#calc-panel input').forEach(inp => {
+  document.querySelectorAll('#calc-panel input, #calc-panel select').forEach(inp => {
     inp.addEventListener('change', () => {
       const filled = [...document.querySelectorAll('#calc-panel input')].filter(i => i.value !== '').length;
       if (filled >= 2) check();
     });
   });
 
-  /* Guided calc — teaching narration, advance when ready */
-  const GUIDE_BEATS = [
-    {
-      text: 'First, read these numbers from the chart: Y (peak-to-peak divisions), X (one-period divisions), volts/div, and time/div.',
-      teach: null, marks: ['ydiv', 'xdiv', 'vdiv', 'tdiv'], plug: null, fill: null, field: null
-    },
-    {
-      text: 'Here: Y = 3.0 div, X = 4.0 div, volts/div = 2 V/div, time/div = 1 ms/div. Keep those four numbers handy.',
-      teach: 'vdiv', marks: ['ydiv', 'xdiv', 'vdiv', 'tdiv'], plug: null, fill: null, field: null
-    },
-    {
-      text: 'Peak-to-peak — plug into the formula: Vpp = Y × volts/div = 3.0 × 2.',
-      teach: 'vpp', marks: ['ydiv'], plug: 'y', fill: null, field: 'vpp'
-    },
-    {
-      text: 'Calculated: Vpp = 6.0 V. That is the full crest-to-trough height in volts.',
-      teach: 'vpp', marks: ['ydiv'], plug: 'y', fill: { vpp: '6' }, field: 'vpp'
-    },
-    {
-      text: 'Amplitude — plug in: A = Vpp / 2 = 6.0 / 2.',
-      teach: 'a', marks: ['peak'], plug: null, fill: null, field: 'a'
-    },
-    {
-      text: 'Calculated: A = 3.0 V. Amplitude is half of peak-to-peak.',
-      teach: 'a', marks: ['peak'], plug: null, fill: { a: '3' }, field: 'a'
-    },
-    {
-      text: 'Period — plug into the formula: T = X × time/div = 4.0 × 1 ms.',
-      teach: 't', marks: ['xdiv'], plug: 'x', fill: null, field: 'tms'
-    },
-    {
-      text: 'Calculated: T = 4.0 ms (= 0.004 s). That is one full cycle.',
-      teach: 't', marks: ['xdiv'], plug: 'x', fill: { tms: '4' }, field: 'tms'
-    },
-    {
-      text: 'Frequency — plug in: f = 1 / T. Convert T to seconds first: 4.0 ms = 0.004 s, so f = 1 / 0.004.',
-      teach: 'f', marks: ['wave'], plug: null, fill: null, field: 'f'
-    },
-    {
-      text: 'Calculated: f = 250 Hz. We have walked through Vpp, A, T, and f — hover the chart anytime to revisit a quantity.',
-      teach: 'f', marks: ['wave'], plug: null, fill: { f: '250' }, field: 'f', done: true
-    }
-  ];
+  /* —— Guided calc — numbers come from the current knob + generator settings —— */
+  function buildBeats() {
+    const Y = round2(readY()), X = round2(readX());
+    const vd = trimNum(S.vdiv, 3), td = trimNum(S.tdiv, 3);
+    const vpp = Y * S.vdiv, a = vpp / 2, tms = X * S.tdiv, ts = tms / 1000, f = 1 / ts;
+    const Ys = trimNum(Y, 2), Xs = trimNum(X, 2), tmsS = trimNum(tms, 4);
+    return [
+      { text: 'First, read these numbers from the chart: Y (peak-to-peak divisions), X (one-period divisions), volts/div, and time/div.',
+        teach: null, marks: ['ydiv', 'xdiv', 'vdiv', 'tdiv'], plug: null, fill: null, field: null },
+      { text: 'Here: Y = ' + Ys + ' div, X = ' + Xs + ' div, volts/div = ' + vd + ' V/div, time/div = ' + td + ' ms/div. Keep those four numbers handy.',
+        teach: 'vdiv', marks: ['ydiv', 'xdiv', 'vdiv', 'tdiv'], plug: null, fill: null, field: null },
+      { text: 'Peak-to-peak — plug into the formula: Vpp = Y × volts/div = ' + Ys + ' × ' + vd + '.',
+        teach: 'vpp', marks: ['ydiv'], plug: 'y', fill: null, field: 'vpp' },
+      { text: 'Calculated: Vpp = ' + fmtV(vpp) + ' V. That is the full crest-to-trough height in volts.',
+        teach: 'vpp', marks: ['ydiv'], plug: 'y', fill: { vpp: fmtV(vpp) }, field: 'vpp' },
+      { text: 'Amplitude — plug in: A = Vpp / 2 = ' + fmtV(vpp) + ' / 2.',
+        teach: 'a', marks: ['peak'], plug: null, fill: null, field: 'a' },
+      { text: 'Calculated: A = ' + fmtV(a) + ' V. Amplitude is half of peak-to-peak.',
+        teach: 'a', marks: ['peak'], plug: null, fill: { a: fmtV(a) }, field: 'a' },
+      { text: 'Period — plug into the formula: T = X × time/div = ' + Xs + ' × ' + td + ' ms.',
+        teach: 't', marks: ['xdiv'], plug: 'x', fill: null, field: 'tms' },
+      { text: 'Calculated: T = ' + tmsS + ' ms. That is one full cycle — but it is still in milliseconds.',
+        teach: 't', marks: ['xdiv'], plug: 'x', fill: { tms: tmsS, tunit: 'ms' }, field: 'tms' },
+      { text: 'Convert to seconds BEFORE 1/T: T = ' + tmsS + ' ms = ' + tmsS + ' × 10⁻³ s = ' + sci(ts) + ' s.',
+        teach: 't', marks: ['xdiv'], plug: null, fill: null, field: 'tms', convert: true },
+      { text: 'Common slip: 1 / ' + tmsS + ' = ' + trimNum(Math.floor(100 / tms) / 100, 2) + ' Hz is wrong — that divides by milliseconds. T must be in seconds.',
+        teach: 'f', marks: ['wave'], plug: null, fill: null, field: 'f', slip: true },
+      { text: 'Frequency — f = 1 / T = 1 / (' + sci(ts) + ' s) = ' + fmtF(f) + ' Hz ≈ ' + fmtFshort(f) + ' Hz. Done: Vpp, A, T and f — turn a knob and the numbers follow.',
+        teach: 'f', marks: ['wave'], plug: null, fill: { f: fmtF(f) }, field: 'f', done: true }
+    ];
+  }
 
   const guideBeatEl = document.getElementById('guide-beat');
+  const guideBox = document.getElementById('guide-box');
   const btnGuide = document.getElementById('btn-guide');
   let guideIndex = -1;
+  const GUIDE_IDLE = 'We will read the chart together — Y, X, volts/div, time/div — then walk each formula one beat at a time.';
 
   function applyGuideBeat(beat) {
     if (!beat) return;
     if (guideBeatEl) guideBeatEl.textContent = beat.text;
-
-    document.querySelectorAll('.teach-row').forEach(r => {
-      const match = beat.teach && r.getAttribute('data-formula') === beat.teach;
-      r.classList.toggle('active', !!match);
-      r.classList.toggle('hot', !!match && !!beat.plug);
-    });
-    if (beat.teach === 'vpp') {
-      const vrow = document.querySelector('.teach-row[data-formula="vdiv"]');
-      if (vrow) vrow.classList.add('active');
+    if (guideBox) {
+      guideBox.classList.toggle('convert', !!beat.convert);
+      guideBox.classList.toggle('slip', !!beat.slip);
     }
-    if (beat.teach === 't') {
-      const trow = document.querySelector('.teach-row[data-formula="tdiv"]');
-      if (trow) trow.classList.add('active');
-    }
-
-    resetSlots();
-    if (beat.plug === 'y' && slotY) {
-      slotY.textContent = String(WORKED.Y);
-      slotY.classList.add('live');
-    } else if (beat.plug === 'x' && slotX) {
-      slotX.textContent = String(WORKED.X);
-      slotX.classList.add('live');
-    }
-
-    document.querySelectorAll('#cro-stage .inspect-mark').forEach(m => {
-      const mark = m.getAttribute('data-mark');
-      m.classList.toggle('on', !!(beat.marks && beat.marks.indexOf(mark) >= 0));
-    });
+    lightTeach(beat.teach, beat.plug);
+    setMarks(beat.marks || []);
     document.querySelectorAll('.calc-field').forEach(f => {
-      f.classList.toggle('awake', beat.field && f.getAttribute('data-key') === beat.field);
+      f.classList.toggle('awake', !!beat.field && f.getAttribute('data-key') === beat.field);
     });
-
     if (beat.fill) {
       Object.keys(beat.fill).forEach(key => {
         const el = document.getElementById('in-' + key);
         if (el) el.value = beat.fill[key];
       });
     }
-
     if (vrTitle) vrTitle.textContent = beat.done ? 'Guided calc complete' : 'Guided calc';
     if (vrBody) vrBody.textContent = beat.text;
     if (vrFormula) vrFormula.textContent = '';
     if (teachHint) teachHint.textContent = beat.text;
   }
 
+  function clearCalc() {
+    document.querySelectorAll('#calc-panel input').forEach(inp => { inp.value = ''; });
+    if (tUnitSel) tUnitSel.value = 'ms';
+    document.querySelectorAll('.calc-field').forEach(f => f.classList.remove('ok', 'bad', 'awake'));
+    const fbCalc = document.getElementById('fb-calc');
+    if (fbCalc) { fbCalc.className = 'calc-feedback'; fbCalc.textContent = ''; }
+  }
+  function stopGuide() {
+    guideIndex = -1;
+    clearInspect();
+    resetSlots();
+    if (guideBox) guideBox.classList.remove('convert', 'slip');
+    if (guideBeatEl) guideBeatEl.textContent = GUIDE_IDLE;
+    if (btnGuide) btnGuide.textContent = 'Start guided calc';
+  }
+
   function advanceGuide() {
     if (!btnGuide) return;
+    const beats = buildBeats();
     if (guideIndex < 0) {
       guideIndex = 0;
-    } else if (guideIndex >= GUIDE_BEATS.length - 1) {
-      guideIndex = -1;
-      clearInspect();
-      document.querySelectorAll('#calc-panel input').forEach(inp => { inp.value = ''; });
-      document.querySelectorAll('.calc-field').forEach(f => {
-        f.classList.remove('ok', 'bad', 'awake');
-      });
-      const fbCalc = document.getElementById('fb-calc');
-      if (fbCalc) { fbCalc.className = 'calc-feedback'; fbCalc.textContent = ''; }
-      resetSlots();
-      if (guideBeatEl) {
-        guideBeatEl.textContent = 'We will read the chart together — Y, X, volts/div, time/div — then walk each formula one beat at a time.';
-      }
-      btnGuide.textContent = 'Start guided calc';
+    } else if (guideIndex >= beats.length - 1) {
+      // Start over: clear answers and return the CRO knobs to lab settings
+      clearCalc();
+      resetScope();
+      stopGuide();
+      onSettingsChanged();
       return;
     } else {
       guideIndex++;
     }
-    const beat = GUIDE_BEATS[guideIndex];
+    const beat = buildBeats()[guideIndex];
     applyGuideBeat(beat);
-    if (beat.done) btnGuide.textContent = 'Start over';
-    else if (guideIndex === 0) btnGuide.textContent = 'Next →';
-    else btnGuide.textContent = 'Next →';
+    btnGuide.textContent = beat.done ? 'Start over' : 'Next →';
     tryRenderMath();
   }
-
   if (btnGuide) btnGuide.addEventListener('click', advanceGuide);
+  const btnResetLab = document.getElementById('btn-reset-lab');
+  if (btnResetLab) btnResetLab.addEventListener('click', () => {
+    resetScope();
+    onSettingsChanged();
+  });
+
+  renderMarks();
+  paintWaveSelect();
+  fillReadingsForm();
 
   /* Optional extras — hover open, auto-close ~500ms after leave */
   const extras = document.getElementById('end-extras');
