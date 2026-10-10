@@ -153,29 +153,29 @@
         "id": "OSC020",
         "type": "mcq",
         "cat": "osc_lab_procedure",
-        "q": "With Y = 3.7 div and volts/div = 0.5 V/div, what is Vpp?",
+        "q": "With Y = 5.2 div and volts/div = 0.5 V/div, what is Vpp?",
         "options": [
-          "1.85 V peak-to-peak",
-          "3.7 V peak-to-peak",
-          "0.925 V peak-to-peak",
-          "7.4 V peak-to-peak"
+          "2.6 V peak-to-peak",
+          "5.2 V peak-to-peak",
+          "1.3 V peak-to-peak",
+          "10.4 V peak-to-peak"
         ],
         "correct": 0,
-        "explain": "Vpp = Y × volts/div = 3.7 × 0.5 = 1.85 V. Amplitude would then be A = 1.85 / 2 = 0.925 V."
+        "explain": "Vpp = Y × volts/div = 5.2 × 0.5 = 2.6 V. Amplitude would then be A = 2.6 / 2 = 1.3 V."
       },
       {
         "id": "OSC021",
         "type": "mcq",
         "cat": "osc_lab_procedure",
-        "q": "With X = 3.3 div and time/div = 0.2 ms/div, what are T and f?",
+        "q": "With X = 4.0 div and time/div = 0.5 ms/div, what are T and f?",
         "options": [
-          "T = 0.66 ms = 6.6 × 10⁻⁴ s and f ≈ 1515 Hz",
-          "T = 0.66 s and f ≈ 1.52 Hz",
-          "T = 3.3 ms and f ≈ 303 Hz",
-          "T = 0.2 ms and f = 5000 Hz"
+          "T = 2.0 ms = 2.0 × 10⁻³ s and f = 500 Hz",
+          "T = 2.0 s and f = 0.5 Hz",
+          "T = 4.0 ms and f = 250 Hz",
+          "T = 0.5 ms and f = 2000 Hz"
         ],
         "correct": 0,
-        "explain": "T = 3.3 × 0.2 ms = 0.66 ms = 6.6 × 10⁻⁴ s. Then f = 1 / (6.6 × 10⁻⁴ s) ≈ 1515 Hz."
+        "explain": "T = 4.0 × 0.5 ms = 2.0 ms = 2.0 × 10⁻³ s. Then f = 1 / (2.0 × 10⁻³ s) = 500 Hz."
       },
       {
         "id": "OSC022",
@@ -265,15 +265,15 @@
         "id": "OSC028",
         "type": "mcq",
         "cat": "osc_lab_procedure",
-        "q": "T = 0.66 ms, and f is written as 1 / 0.66 = 1.51 Hz. What went wrong?",
+        "q": "T = 2.0 ms, and f is written as 1 / 2.0 = 0.5 Hz. What went wrong?",
         "options": [
-          "T was not converted to seconds first; 0.66 ms = 6.6 × 10⁻⁴ s, so f ≈ 1515 Hz",
-          "Nothing — 1.51 Hz is the correct frequency",
+          "T was not converted to seconds first; 2.0 ms = 2.0 × 10⁻³ s, so f = 500 Hz",
+          "Nothing — 0.5 Hz is the correct frequency",
           "Frequency should be T / 2, not 1 / T",
           "T should have been multiplied by volts/div"
         ],
         "correct": 0,
-        "explain": "f = 1/T needs T in seconds. 0.66 ms = 0.66 × 10⁻³ s = 6.6 × 10⁻⁴ s, so f = 1 / (6.6 × 10⁻⁴) ≈ 1515 Hz. Dividing by 0.66 (milliseconds) gives a value 1000× too small."
+        "explain": "f = 1/T needs T in seconds. 2.0 ms = 2.0 × 10⁻³ s, so f = 1 / (2.0 × 10⁻³) = 500 Hz. Dividing by 2.0 (milliseconds) gives a value 1000× too small."
       }
     ]
   }

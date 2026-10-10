@@ -388,7 +388,7 @@
   const VDIV_STEPS = [0.1, 0.2, 0.5, 1, 2, 5];
   const TDIV_STEPS = [0.05, 0.1, 0.2, 0.5, 1, 2];
   /* Default (example) signal and scale: the starting state of the simulated CRO */
-  const LAB = { wave: 'tri', vpp: 1.85, freq: 1000 / 0.66, vdiv: 0.5, tdiv: 0.2, xpos: 0, ypos: 0 };
+  const LAB = { wave: 'tri', vpp: 2.6, freq: 500, vdiv: 0.5, tdiv: 0.5, xpos: 0, ypos: 0 };
   const S = Object.assign({}, LAB);
   const TRIG_DIV = -4;            // trigger point sits on the −4 gridline when X-POS = 0
   const vdivSteps = VDIV_STEPS.slice();
@@ -990,7 +990,7 @@
     if (reMsg) { reMsg.className = 're-msg ok'; reMsg.textContent = 'Screen redrawn: Y = ' + trimNum(y, 3) + ' div, X = ' + trimNum(x, 3) + ' div.'; }
   });
 
-  /* —— Answer checking: graded live against the current signal (±2%) —— */
+  /* —— Answer checking: checked live against the current signal (±2%) —— */
   const tUnitSel = document.getElementById('in-tunit');
   function within(v, target, rel) {
     return typeof v === 'number' && isFinite(v) && Math.abs(v - target) <= Math.abs(target) * rel + 1e-12;
